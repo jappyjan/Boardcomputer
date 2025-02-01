@@ -2,6 +2,7 @@
 
 OnOffChannelHandler::OnOffChannelHandler(uint8_t pin) : pin(pin)
 {
+    pinMode(pin, OUTPUT);
 }
 
 void OnOffChannelHandler::isOnWhen(std::function<bool(uint16_t value)> isOn)
