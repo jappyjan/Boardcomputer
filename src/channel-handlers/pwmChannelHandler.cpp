@@ -2,13 +2,13 @@
 
 bool PWMChannelHandler::isGlobalSetupDone = false;
 
-
 PWMChannelHandler::PWMChannelHandler(uint8_t pin, uint16_t min, uint16_t max) : pin(pin)
 {
     pinMode(pin, OUTPUT);
 
     this->min = min;
     this->max = max;
+    this->inverted = false;
 }
 
 void PWMChannelHandler::setup(uint16_t initialPosition)
@@ -30,6 +30,24 @@ void PWMChannelHandler::setup(uint16_t initialPosition)
 
 void PWMChannelHandler::onChannelChange(uint16_t value)
 {
-    int outputValue = map(value, CHANNEL_MIN, CHANNEL_MAX, this->min, this->max);
-    this->output.write(outputValue);
+    int finalMin = this->inverted ? CHANNEL_MAX : CHANNEL_MIN;
+    int finalMax = this->inverted ? CHANNEL_MIN : CHANNEL_MAX;
+
+    int outputValue = map(value, finalMin, finalMax, this->min, this->max);
+    if (outputValue < this->min)
+    {
+        outputValue = this->min;
+    }
+    else if (outputValue > this->max)
+    {
+        outputValue = this->max;
+    }
+
+    this->output.writeMicroseconds(outputValue);
+}
+
+void PWMChannelHandler::setInverted(bool inverted)
+{
+    Serial.printf("Setting pin %d to inverted: %d\n", this->pin, inverted);
+    this->inverted = inverted;
 }

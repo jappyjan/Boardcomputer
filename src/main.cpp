@@ -33,20 +33,23 @@ PWMChannelHandler winch2PWMHandler(WINCH_2_PWM_PIN);
 void setup()
 {
   Serial.begin(115200);
+  delay(3000);
   Serial.println("Starting board computer");
 
   steeringPWMHandler.setup(PWM_CENTER);
   boardComputer.onChannelChange(STEERING_CHANNEL, &steeringPWMHandler, CHANNEL_MID);
 
   throttlePWMHandler.setup();
+#ifdef THROTTLE_INVERTED
+  throttlePWMHandler.setInverted(true);
+#endif
   boardComputer.onChannelChange(THROTTLE_CHANNEL, &throttlePWMHandler, CHANNEL_MID);
 
   headlightHandler.isOnWhen([](uint16_t value)
                             { 
                               bool isOn = value > HEADLIGHT_ON_THRESHOLD;
                               Serial.printf("headlight is on: %d (value: %d, threshold: %d)\n", isOn, value, HEADLIGHT_ON_THRESHOLD);
-                              return isOn;
-                            });
+                              return isOn; });
   boardComputer.onChannelChange(HEADLIGHT_CHANNEL, &headlightHandler, CHANNEL_MIN);
 
   // blinker left is on when steering is left
@@ -54,8 +57,7 @@ void setup()
                               { 
                                 bool isOn = value < STEERING_LEFT_VALUE;
                                 Serial.printf("blinker left is on: %d (value: %d, threshold: %d)\n", isOn, value, STEERING_LEFT_VALUE);
-                                return isOn; 
-                              });
+                                return isOn; });
   boardComputer.onChannelChange(STEERING_CHANNEL, &blinkerLeftHandler, CHANNEL_MIN);
 
   // blinker right is on when steering is right
@@ -63,8 +65,7 @@ void setup()
                                { 
                                  bool isOn = value > STEERING_RIGHT_VALUE;
                                  Serial.printf("blinker right is on: %d (value: %d, threshold: %d)\n", isOn, value, STEERING_RIGHT_VALUE);
-                                 return isOn; 
-                               });
+                                 return isOn; });
   boardComputer.onChannelChange(STEERING_CHANNEL, &blinkerRightHandler, CHANNEL_MIN);
 
   // brake light is on when throttle is in the middle (channel mid +/- 10%)
@@ -72,8 +73,7 @@ void setup()
                              { 
                                bool isOn = value <= BREAK_LIGHT_THRESHOLD;
                                Serial.printf("brake light is on: %d (value: %d, threshold: %d)\n", isOn, value, BREAK_LIGHT_THRESHOLD);
-                               return isOn; 
-                             });
+                               return isOn; });
   boardComputer.onChannelChange(THROTTLE_CHANNEL, &brakeLightHandler, CHANNEL_MIN);
 
   winch1PWMHandler.setup(CHANNEL_MID);
