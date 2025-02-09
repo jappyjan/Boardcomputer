@@ -34,4 +34,5 @@ private:
 
     void startWebServer();
     void setupRoutes();
+    void stopWebServer();
 };

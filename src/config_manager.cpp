@@ -106,6 +106,9 @@ bool ConfigManager::configure(const Config &config)
         Serial.println("Warning: No handlers configured");
     }
 
+    // Clean up old configuration
+    computer->cleanup();
+
     // Store the new configuration
     this->config = config;
 

@@ -288,3 +288,20 @@ String BoardComputer::getPinMap()
     serializeJson(doc, output);
     return output;
 }
+
+void BoardComputer::cleanup()
+{
+    for (uint8_t channel = 0; channel < HIGHEST_CHANNEL_NUMBER; channel++)
+    {
+        for (uint8_t i = 0; i < handlerCount[channel]; i++)
+        {
+            if (channelHandlers[channel][i])
+            {
+                delete channelHandlers[channel][i];
+                channelHandlers[channel][i] = nullptr;
+                failSafeChannelValues[channel][i] = -1;
+            }
+        }
+        handlerCount[channel] = 0;
+    }
+}

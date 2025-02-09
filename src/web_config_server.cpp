@@ -58,10 +58,16 @@ void WebConfigServer::update()
     {
         startWebServer();
     }
+    else if (webServerStarted && !boardComputer->hasError() && boardComputer->isReceiving())
+    {
+        // Stop the web server if system is healthy
+        Serial.println("[WebServer] Stopping due to system returning to healthy state");
+        stopWebServer();
+    }
 
     if (webServerStarted)
     {
-        handleDNS(); // Handle DNS requests if server is running
+        handleDNS();
     }
 }
 
@@ -257,4 +263,19 @@ void WebConfigServer::startWebServer()
 
     webServerStarted = true;
     Serial.println("[WebServer] Web server started and ready for connections");
+}
+
+// Add this new method to handle server shutdown
+void WebConfigServer::stopWebServer()
+{
+    if (!webServerStarted)
+        return;
+
+    server.end();
+    dnsServer.stop();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+
+    webServerStarted = false;
+    Serial.println("[WebServer] Web server stopped");
 }

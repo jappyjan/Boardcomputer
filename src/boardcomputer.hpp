@@ -48,6 +48,12 @@ public:
 
     String getPinMap();
 
+    /**
+     * @brief Cleans up all handlers for all channels
+     * Deletes handler instances and clears the arrays
+     */
+    void cleanup();
+
 private:
     void taskHandler();
     IChannelHandler *channelHandlers[HIGHEST_CHANNEL_NUMBER][MAX_HANDLERS_PER_CHANNEL];
