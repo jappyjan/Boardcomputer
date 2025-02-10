@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <CRC32.h>
 #include "config_versions.hpp"
+#include "logger.hpp"
 
 class EEPROMManager
 {
@@ -25,30 +26,30 @@ public:
     bool begin(size_t dataSize)
     {
         size_t totalSize = HEADER_SIZE + dataSize;
-        Serial.printf("Initializing EEPROM with header size %d + data size %d = %d total bytes\n",
-                      HEADER_SIZE, dataSize, totalSize);
+        LOG.debugf("EEPROMManager", "Initializing EEPROM with header size %d + data size %d = %d total bytes",
+                   HEADER_SIZE, dataSize, totalSize);
 
         // ESP32/8266 EEPROM size must be multiple of 4
         if (totalSize % 4 != 0)
         {
             totalSize += 4 - (totalSize % 4);
-            Serial.printf("Adjusted EEPROM size to %d bytes to match 4-byte alignment\n", totalSize);
+            LOG.debugf("EEPROMManager", "Adjusted EEPROM size to %d bytes to match 4-byte alignment", totalSize);
         }
 
         bool success = EEPROM.begin(totalSize);
         if (!success)
         {
-            Serial.println("EEPROM.begin() failed!");
+            LOG.error("EEPROMManager", "EEPROM.begin() failed!");
 #ifdef ESP32
-            Serial.println("On ESP32, check if partition table includes EEPROM partition");
+            LOG.error("EEPROMManager", "On ESP32, check if partition table includes EEPROM partition");
 #endif
 #ifdef ESP8266
-            Serial.println("On ESP8266, check if flash size is configured correctly");
+            LOG.error("EEPROMManager", "On ESP8266, check if flash size is configured correctly");
 #endif
         }
         else
         {
-            Serial.printf("EEPROM initialized with size %d bytes\n", EEPROM.length());
+            LOG.infof("EEPROMManager", "EEPROM initialized with size %d bytes", EEPROM.length());
         }
         return success;
     }
@@ -61,14 +62,6 @@ public:
         memset(buffer, 0, sizeof(T));
         memcpy(buffer, &data, sizeof(T));
 
-        // Debug print
-        Serial.print("Checksum calculation - First 32 bytes: ");
-        for (int i = 0; i < min(32, (int)sizeof(T)); i++)
-        {
-            Serial.printf("%02X ", buffer[i]);
-        }
-        Serial.println();
-
         CRC32 crc;
         crc.update(buffer, sizeof(T));
         return crc.finalize();
@@ -80,8 +73,8 @@ public:
         // Add size verification
         if (sizeof(T) + HEADER_SIZE > EEPROM.length())
         {
-            Serial.printf("ERROR: Data too large. Total size needed: %d, EEPROM size: %d\n",
-                          sizeof(T) + HEADER_SIZE, EEPROM.length());
+            LOG.errorf("EEPROMManager", "Data too large. Total size needed: %d, EEPROM size: %d",
+                       sizeof(T) + HEADER_SIZE, EEPROM.length());
             return false;
         }
 
@@ -92,13 +85,8 @@ public:
         header.timestamp = millis();
         header.checksum = calculateChecksum(data);
 
-        Serial.println("Writing to EEPROM:");
-        Serial.printf("  Magic: 0x%08X\n", header.magic);
-        Serial.printf("  Version: %d\n", header.version);
-        Serial.printf("  Data Size: %d bytes\n", header.dataSize);
-        Serial.printf("  Checksum: 0x%08X\n", header.checksum);
-        Serial.printf("  Timestamp: %lu\n", header.timestamp);
-        Serial.printf("  EEPROM total size: %d bytes\n", EEPROM.length());
+        LOG.debugf("EEPROMManager", "Writing to EEPROM: Magic=0x%08X, Ver=%d, Size=%d, CRC=0x%08X",
+                   header.magic, header.version, header.dataSize, header.checksum);
 
         // Write header
         EEPROM.put(0, header);
@@ -110,16 +98,16 @@ public:
         T readback;
         EEPROM.get(HEADER_SIZE, readback);
         uint32_t readbackChecksum = calculateChecksum(readback);
-        Serial.printf("  Write verification checksum: 0x%08X\n", readbackChecksum);
+        LOG.debugf("EEPROMManager", "  Write verification checksum: 0x%08X", readbackChecksum);
 
         if (readbackChecksum != header.checksum)
         {
-            Serial.println("ERROR: Write verification failed - checksums don't match");
+            LOG.error("EEPROMManager", "Write verification failed - checksums don't match");
             return false;
         }
 
         bool success = EEPROM.commit();
-        Serial.printf("EEPROM commit %s\n", success ? "successful" : "failed");
+        LOG.debugf("EEPROMManager", "EEPROM write successful");
         return success;
     }
 
@@ -129,19 +117,19 @@ public:
         DataHeader header;
         EEPROM.get(0, header);
 
-        Serial.println("Reading from EEPROM:");
-        Serial.printf("  Magic: 0x%08X\n", header.magic);
-        Serial.printf("  Version: %d\n", header.version);
-        Serial.printf("  Data Size: %d bytes\n", header.dataSize);
-        Serial.printf("  Checksum: 0x%08X\n", header.checksum);
-        Serial.printf("  Timestamp: %lu\n", header.timestamp);
-        Serial.printf("  Expected data size: %d bytes\n", sizeof(T));
+        LOG.debug("EEPROMManager", "Reading from EEPROM:");
+        LOG.debugf("EEPROMManager", "  Magic: 0x%08X", header.magic);
+        LOG.debugf("EEPROMManager", "  Version: %d", header.version);
+        LOG.debugf("EEPROMManager", "  Data Size: %d bytes", header.dataSize);
+        LOG.debugf("EEPROMManager", "  Checksum: 0x%08X", header.checksum);
+        LOG.debugf("EEPROMManager", "  Timestamp: %lu", header.timestamp);
+        LOG.debugf("EEPROMManager", "  Expected data size: %d bytes", sizeof(T));
 
         // Validate magic number
         if (header.magic != MAGIC_NUMBER)
         {
-            Serial.printf("Invalid magic number in EEPROM. Expected: 0x%08X, Got: 0x%08X\n",
-                          MAGIC_NUMBER, header.magic);
+            LOG.errorf("EEPROMManager", "Invalid magic number in EEPROM. Expected: 0x%08X, Got: 0x%08X",
+                       MAGIC_NUMBER, header.magic);
             return false;
         }
 
@@ -154,31 +142,28 @@ public:
         {
             if (!migrateData(readData, header.version))
             {
-                Serial.println("Migration failed");
+                LOG.errorf("EEPROMManager", "Migration failed");
                 return false;
             }
         }
 
         // Calculate checksum
         uint32_t calculatedChecksum = calculateChecksum(readData);
-        Serial.printf("Checksum comparison:\n");
-        Serial.printf("  Stored:     0x%08X\n", header.checksum);
-        Serial.printf("  Calculated: 0x%08X\n", calculatedChecksum);
 
         if (calculatedChecksum == header.checksum)
         {
             memcpy(&data, &readData, sizeof(T));
-            Serial.println("EEPROM read successful");
+            LOG.infof("EEPROMManager", "EEPROM read successful");
             return true;
         }
 
-        Serial.println("Checksum verification failed");
+        LOG.errorf("EEPROMManager", "Checksum verification failed");
         return false;
     }
 
     bool clear()
     {
-        Serial.println("Clearing EEPROM...");
+        LOG.infof("EEPROMManager", "Clearing EEPROM...");
         for (size_t i = 0; i < EEPROM.length(); i++)
         {
             EEPROM.write(i, 0);
@@ -199,36 +184,18 @@ private:
             return true; // No migration needed
         }
 
-        Serial.printf("Migrating data from version %d to %d\n", fromVersion, CURRENT_VERSION);
+        LOG.infof("EEPROMManager", "Migrating data from version %d to %d", fromVersion, CURRENT_VERSION);
 
         while (fromVersion < CURRENT_VERSION)
         {
-            // Example migration from V1 to V2
-            if (fromVersion == 1)
+            LOG.errorf("EEPROMManager", "No migration path from version %d to %d", fromVersion, CURRENT_VERSION);
+            while (true)
             {
-                // Read old format
-                ConfigVersions::ConfigV1 oldConfig;
-                EEPROM.get(HEADER_SIZE, oldConfig);
-
-                // Convert to new format
-                ConfigVersions::ConfigV2 newConfig;
-
-                // Copy common fields
-                newConfig.numHandlers = oldConfig.numHandlers;
-                memcpy(newConfig.handlers, oldConfig.handlers, sizeof(oldConfig.handlers));
-
-                // Set new fields to defaults
-                strncpy(newConfig.apSsid, "Boardcomputer", sizeof(newConfig.apSsid) - 1);
-                strncpy(newConfig.apPassword, "Boardcomputer", sizeof(newConfig.apPassword) - 1);
-
-                // Copy back to output
-                memcpy(&data, &newConfig, sizeof(newConfig));
-
-                fromVersion = 2;
+                delay(1000);
             }
         }
 
-        Serial.printf("No migration path from version %d to %d\n", fromVersion, CURRENT_VERSION);
+        LOG.infof("EEPROMManager", "No migration path from version %d to %d", fromVersion, CURRENT_VERSION);
         return false;
     }
 };

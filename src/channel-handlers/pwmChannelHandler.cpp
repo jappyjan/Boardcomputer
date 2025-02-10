@@ -1,53 +1,51 @@
 #include "pwmChannelHandler.hpp"
+#include "logger.hpp"
 
 bool PWMChannelHandler::isGlobalSetupDone = false;
 
 PWMChannelHandler::PWMChannelHandler(uint8_t pin, uint16_t min, uint16_t max) : pin(pin)
 {
     pinMode(pin, OUTPUT);
-
     this->min = min;
     this->max = max;
     this->inverted = false;
+
+    // Configure servo - let ESP32Servo handle timer allocation dynamically
+    this->output.setPeriodHertz(50); // Standard 50hz servo
+    if (this->output.attach(pin, min, max))
+    {
+        LOG.debugf("PWMHandler", "Initialized servo on pin %d (range: %d-%d)", pin, min, max);
+    }
+    else
+    {
+        LOG.errorf("PWMHandler", "Failed to initialize servo on pin %d", pin);
+    }
 }
 
 void PWMChannelHandler::setup(uint16_t initialPosition)
 {
-    if (!PWMChannelHandler::isGlobalSetupDone)
-    {
-        PWMChannelHandler::isGlobalSetupDone = true;
-        ESP32PWM::allocateTimer(0);
-        ESP32PWM::allocateTimer(1);
-        ESP32PWM::allocateTimer(2);
-        ESP32PWM::allocateTimer(3);
-    }
-
-    this->output.setPeriodHertz(50);
-    this->output.write(initialPosition);
-    this->output.attach(this->pin);
-    this->output.write(initialPosition);
+    // Set initial position
+    this->output.writeMicroseconds(initialPosition);
+    LOG.debugf("PWMHandler", "Set initial position to %d on pin %d", initialPosition, pin);
 }
 
 void PWMChannelHandler::onChannelChange(uint16_t value)
 {
-    int finalMin = this->inverted ? CHANNEL_MAX : CHANNEL_MIN;
-    int finalMax = this->inverted ? CHANNEL_MIN : CHANNEL_MAX;
-
-    int outputValue = map(value, finalMin, finalMax, this->min, this->max);
-    if (outputValue < this->min)
+    // For servos, we want to use the raw channel value (1000-2000) directly
+    // but constrain it to our min/max range
+    uint16_t constrainedValue = value;
+    if (this->inverted)
     {
-        outputValue = this->min;
-    }
-    else if (outputValue > this->max)
-    {
-        outputValue = this->max;
+        constrainedValue = map(value, CHANNEL_MIN, CHANNEL_MAX, CHANNEL_MAX, CHANNEL_MIN);
     }
 
-    this->output.writeMicroseconds(outputValue);
+    constrainedValue = constrain(constrainedValue, this->min, this->max);
+
+    this->output.writeMicroseconds(constrainedValue);
 }
 
 void PWMChannelHandler::setInverted(bool inverted)
 {
-    Serial.printf("Setting pin %d to inverted: %d\n", this->pin, inverted);
+    LOG.infof("PWMHandler", "Setting pin %d to inverted: %s", this->pin, inverted ? "yes" : "no");
     this->inverted = inverted;
 }

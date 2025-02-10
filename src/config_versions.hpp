@@ -55,32 +55,29 @@ struct HandlerConfig
 
 namespace ConfigVersions
 {
-    struct ConfigV1
-    {
-        static constexpr size_t MAX_HANDLERS = 20;
-        uint32_t numHandlers;
-        HandlerConfig handlers[MAX_HANDLERS];
-    };
 
-    struct ConfigV2
+    struct ConfigV1
     {
         static constexpr size_t MAX_HANDLERS = 20;
         uint32_t numHandlers;
         HandlerConfig handlers[MAX_HANDLERS];
         char apSsid[32];
         char apPassword[32];
+        bool keepWebServerRunning;
 
-        ConfigV2()
+        ConfigV1()
         {
             numHandlers = 0;
             strncpy(apSsid, "Boardcomputer", sizeof(apSsid) - 1);
             strncpy(apPassword, "boardcomputer", sizeof(apPassword) - 1);
             apSsid[sizeof(apSsid) - 1] = '\0';
             apPassword[sizeof(apPassword) - 1] = '\0';
+            keepWebServerRunning = false;
         }
     };
+
 }
 
-using Config = ConfigVersions::ConfigV2;
+using Config = ConfigVersions::ConfigV1;
 
 static_assert(std::is_standard_layout<Config>::value, "Config must be standard layout for EEPROM storage");

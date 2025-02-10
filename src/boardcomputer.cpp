@@ -2,11 +2,13 @@
 #include "board_pin_map.hpp"
 #include <ArduinoJson.h>
 
+#include "logger.hpp"
+
 BoardComputer::BoardComputer(HardwareSerial *crsfSerial) : crsfSerial(crsfSerial), lastValidSignalTime(0), errorState(false)
 {
     if (!crsfSerial)
     {
-        Serial.println("Error: crsfSerial cannot be null");
+        LOG.error("BoardComputer", "crsfSerial cannot be null");
         while (true)
         {
             delay(100); // Prevent watchdog reset while halting
@@ -30,59 +32,91 @@ BoardComputer::BoardComputer(HardwareSerial *crsfSerial) : crsfSerial(crsfSerial
 
 void BoardComputer::start()
 {
+    LOG.info("BoardComputer", "Initializing board computer");
+
     pinMode(STATUS_LED_PIN, OUTPUT);
     digitalWrite(STATUS_LED_PIN, LOW);
+    LOG.debug("BoardComputer", "Status LED initialized");
 
+    // LED task - lowest priority
     xTaskCreate(
         [](void *pvParameters) -> void
         { static_cast<BoardComputer *>(pvParameters)->statusLedTaskHandler(pvParameters); },
-        "statusLedTaskHandler",
-        2048,
+        "statusLedTask",
+        4096,
         this,
-        1,
+        1, // Lowest priority
         NULL);
+    LOG.debug("BoardComputer", "Status LED task created");
 
-    // Validate crsfSerial before using it
     if (!crsfSerial)
     {
         this->status = BoardComputerStatus_ERROR;
-        Serial.println("Invalid crsfSerial configuration - null pointer");
+        LOG.error("BoardComputer", "Invalid crsfSerial configuration - null pointer");
         while (true)
         {
-            delay(100); // Prevent watchdog reset while halting
+            delay(100);
         }
     }
 
+    LOG.infof("BoardComputer", "Configuring CRSF serial on pins RX:%d, TX:%d", CRSF_RX_PIN, CRSF_TX_PIN);
     crsfSerial->begin(CRSF_BAUDRATE, SERIAL_8N1, CRSF_RX_PIN, CRSF_TX_PIN);
+    LOG.debug("BoardComputer", "Serial configuration complete");
 
     crsf.begin(*crsfSerial);
+    LOG.debug("BoardComputer", "CRSF protocol initialized");
 
-    // create a new rtos task and execute a lambda that calls run()
+    // Main task - higher priority
     xTaskCreate([](void *pvParameters) -> void
                 { static_cast<BoardComputer *>(pvParameters)->taskHandler(); },
                 "BoardComputer",
-                2048,
+                8192,
                 this,
-                1,
+                2, // Higher priority than LED task
                 NULL);
+    LOG.debug("BoardComputer", "Main board computer task created");
 }
 
 void BoardComputer::taskHandler()
 {
     const int loopIntervalMs = 1000 / UPDATE_LOOP_FREQUENCY_HZ;
     TickType_t lastWakeTime = xTaskGetTickCount();
+    unsigned long lastDebugTime = 0;
+    const unsigned long DEBUG_INTERVAL = 1000; // Print debug info every second
+
+    LOG.info("BoardComputer", "Starting CRSF task handler");
+    LOG.infof("BoardComputer", "CRSF configured on Serial0 - RX: %d, TX: %d @ %d baud",
+              CRSF_RX_PIN, CRSF_TX_PIN, CRSF_BAUDRATE);
 
     while (true)
     {
-        this->crsf.update();
+        unsigned long currentTime = millis();
 
+        // Update CRSF and immediately check link status
+        this->crsf.update();
         if (crsf.isLinkUp())
         {
-            this->status = BoardComputerStatus_CRSF_CONNECTED;
+            lastValidSignalTime = currentTime; // Update timestamp when link is up
+
+            if (this->status != BoardComputerStatus_CRSF_CONNECTED)
+            {
+                LOG.info("BoardComputer", "CRSF link established");
+                this->status = BoardComputerStatus_CRSF_CONNECTED;
+            }
         }
         else
         {
-            this->status = BoardComputerStatus_CRSF_DISCONNECTED;
+            if (this->status != BoardComputerStatus_CRSF_DISCONNECTED)
+            {
+                LOG.info("BoardComputer", "CRSF link lost");
+                this->status = BoardComputerStatus_CRSF_DISCONNECTED;
+            }
+        }
+
+        // Debug logging every second
+        if (currentTime - lastDebugTime >= DEBUG_INTERVAL)
+        {
+            lastDebugTime = currentTime;
         }
 
         this->executeChannelHandlers();
@@ -94,9 +128,15 @@ void BoardComputer::taskHandler()
 
 void BoardComputer::onChannelChange(uint8_t channel, IChannelHandler *handler, int failSafeChannelValue)
 {
-    if (channel >= HIGHEST_CHANNEL_NUMBER)
+    // Convert 1-based channel number to 0-based index
+    uint8_t channelIndex = channel - 1;
+
+    LOG.debugf("BoardComputer", "Registering handler for channel %d (index %d)",
+               channel, channelIndex);
+
+    if (channelIndex >= HIGHEST_CHANNEL_NUMBER)
     {
-        Serial.printf("Error: Channel %d exceeds maximum channel number\n", channel);
+        LOG.errorf("BoardComputer", "Channel %d exceeds maximum channel number", channel);
         this->status = BoardComputerStatus_ERROR;
         while (true)
         {
@@ -104,9 +144,9 @@ void BoardComputer::onChannelChange(uint8_t channel, IChannelHandler *handler, i
         }
     }
 
-    if (handlerCount[channel] >= MAX_HANDLERS_PER_CHANNEL)
+    if (handlerCount[channelIndex] >= MAX_HANDLERS_PER_CHANNEL)
     {
-        Serial.printf("Error: Maximum handlers reached for channel %d\n", channel);
+        LOG.errorf("BoardComputer", "Maximum handlers reached for channel %d", channel);
         this->status = BoardComputerStatus_ERROR;
         while (true)
         {
@@ -114,14 +154,28 @@ void BoardComputer::onChannelChange(uint8_t channel, IChannelHandler *handler, i
         }
     }
 
-    channelHandlers[channel][handlerCount[channel]] = handler;
-    failSafeChannelValues[channel][handlerCount[channel]] = failSafeChannelValue;
-    handlerCount[channel]++;
+    channelHandlers[channelIndex][handlerCount[channelIndex]] = handler;
+    failSafeChannelValues[channelIndex][handlerCount[channelIndex]] = failSafeChannelValue;
+    handlerCount[channelIndex]++;
 }
 
 void BoardComputer::executeChannelHandlers()
 {
-    bool hasValidSignal = crsf.isLinkUp() && ((millis() - lastValidSignalTime) < SIGNAL_TIMEOUT_MS);
+    unsigned long currentTime = millis();
+    bool hasValidSignal = crsf.isLinkUp() && ((currentTime - lastValidSignalTime) < SIGNAL_TIMEOUT_MS);
+
+    if (!hasValidSignal)
+    {
+        static unsigned long lastTimeoutLog = 0;
+        if (currentTime - lastTimeoutLog >= 5000)
+        { // Log timeout every second
+            LOG.warningf("BoardComputer", "Signal timeout - Last valid: %lums ago, Link: %s, Status: %d",
+                         currentTime - lastValidSignalTime,
+                         crsf.isLinkUp() ? "UP" : "DOWN",
+                         this->status);
+            lastTimeoutLog = currentTime;
+        }
+    }
 
     for (int channel = 0; channel < HIGHEST_CHANNEL_NUMBER; channel++)
     {
@@ -129,7 +183,7 @@ void BoardComputer::executeChannelHandlers()
 
         if (hasValidSignal)
         {
-            currentValue = crsf.getChannel(channel);
+            currentValue = crsf.getChannel(channel + 1);
             if (currentValue < CHANNEL_MIN)
             {
                 currentValue = CHANNEL_MIN;
@@ -138,7 +192,7 @@ void BoardComputer::executeChannelHandlers()
             {
                 currentValue = CHANNEL_MAX;
             }
-            lastValidSignalTime = millis();
+            lastValidSignalTime = currentTime;
             errorState = false;
         }
         else
@@ -179,7 +233,6 @@ void BoardComputer::executeChannelHandlers()
                 continue;
             }
 
-            Serial.printf("channel %d changed to %d\n", channel, currentValue);
             channelHandlers[channel][handlerIndex]->onChannelChange(currentValue);
         }
 
@@ -251,7 +304,7 @@ void BoardComputer::statusLedTaskHandler(void *pvParameters)
             break;
 
         default:
-            Serial.printf("unknown %d\n", random(0, 100));
+            LOG.warningf("BoardComputer", "unknown status reached: %d", boardComputer->status);
             break;
         }
     }

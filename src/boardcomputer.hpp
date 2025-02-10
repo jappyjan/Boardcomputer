@@ -54,6 +54,16 @@ public:
      */
     void cleanup();
 
+    int getChannelValue(uint8_t channel) const
+    {
+        if (channel >= HIGHEST_CHANNEL_NUMBER)
+            return CHANNEL_MID;
+        // CRSF uses 1-based channels, so add 1 to our 0-based index
+        return lastChannelValues[channel];
+    }
+
+    BoardComputerStatus getStatus() const { return status; }
+
 private:
     void taskHandler();
     IChannelHandler *channelHandlers[HIGHEST_CHANNEL_NUMBER][MAX_HANDLERS_PER_CHANNEL];

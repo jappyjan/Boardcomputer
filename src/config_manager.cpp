@@ -1,5 +1,6 @@
 #include "config_manager.hpp"
 #include "eeprom_manager.hpp"
+#include "logger.hpp"
 
 ConfigManager::ConfigManager(BoardComputer *computer, EEPROMManager *eeprom)
     : computer(computer), eeprom(eeprom), config(), eepromInitialized(false)
@@ -9,11 +10,11 @@ ConfigManager::ConfigManager(BoardComputer *computer, EEPROMManager *eeprom)
 
 bool ConfigManager::begin()
 {
-    Serial.printf("Initializing EEPROM for Config size: %d bytes\n", sizeof(Config));
+    LOG.debugf("ConfigManager", "Initializing EEPROM for Config size: %d bytes", sizeof(Config));
     eepromInitialized = eeprom->begin(sizeof(Config));
     if (!eepromInitialized)
     {
-        Serial.println("ERROR: Failed to initialize EEPROM");
+        LOG.error("ConfigManager", "Failed to initialize EEPROM");
         return false;
     }
 
@@ -21,7 +22,7 @@ bool ConfigManager::begin()
     Config testConfig;
     if (!eeprom->read(testConfig))
     {
-        Serial.println("Invalid data in EEPROM, clearing...");
+        LOG.error("ConfigManager", "Invalid data in EEPROM, clearing...");
         eeprom->clear();
     }
 
@@ -34,7 +35,7 @@ bool ConfigManager::load(const Config &config)
 
     if (!eepromInitialized)
     {
-        Serial.println("ERROR: Cannot write to EEPROM - not initialized");
+        LOG.error("ConfigManager", "Cannot write to EEPROM - not initialized");
         return false;
     }
 
@@ -45,14 +46,14 @@ bool ConfigManager::loadFromEEPROM()
 {
     if (!eepromInitialized)
     {
-        Serial.println("ERROR: Cannot read from EEPROM - not initialized");
+        LOG.error("ConfigManager", "Cannot read from EEPROM - not initialized");
         return false;
     }
 
     Config config;
     if (!eeprom->read(config))
     {
-        Serial.println("Failed to load config, using defaults");
+        LOG.error("ConfigManager", "Failed to load config, using defaults");
         return false;
     }
     return configure(config);
@@ -91,6 +92,10 @@ String ConfigManager::getConfigAsJson()
         handlerObj["offTime"] = handler.offTime;
     }
 
+    doc["apSsid"] = config.apSsid;
+    doc["apPassword"] = config.apPassword;
+    doc["keepWebServerRunning"] = config.keepWebServerRunning;
+
     String output;
     serializeJson(doc, output);
     return output;
@@ -98,12 +103,12 @@ String ConfigManager::getConfigAsJson()
 
 bool ConfigManager::configure(const Config &config)
 {
-    Serial.println("Starting configuration...");
+    LOG.info("ConfigManager", "Starting configuration...");
 
     // Basic validation
     if (config.numHandlers == 0)
     {
-        Serial.println("Warning: No handlers configured");
+        LOG.warning("ConfigManager", "No handlers configured");
     }
 
     // Clean up old configuration
@@ -115,8 +120,8 @@ bool ConfigManager::configure(const Config &config)
     for (size_t i = 0; i < config.numHandlers; i++)
     {
         const auto &handler = config.handlers[i];
-        Serial.printf("\nConfiguring %s handler for pin '%s' on channel %d\n",
-                      handler.type, handler.pin, handler.channel);
+        LOG.debugf("ConfigManager", "Configuring %s handler for pin '%s' on channel %d",
+                   handler.type, handler.pin, handler.channel);
 
         if (strcmp(handler.type, "pwm") == 0)
         {
@@ -132,11 +137,11 @@ bool ConfigManager::configure(const Config &config)
         }
         else
         {
-            Serial.printf("WARNING: Unknown handler type '%s'\n", handler.type);
+            LOG.warningf("ConfigManager", "Unknown handler type '%s'", handler.type);
         }
     }
 
-    Serial.println("\nConfiguration complete!");
+    LOG.info("ConfigManager", "Configuration complete!");
     return true;
 }
 
@@ -144,14 +149,15 @@ void ConfigManager::configurePWMHandler(const HandlerConfig &handlerConfig)
 {
     if (!handlerConfig.failsafe)
     {
-        Serial.println("ERROR: PWM handler requires 'failsafe' value");
+        LOG.error("ConfigManager", "PWM handler requires 'failsafe' value");
         return;
     }
 
     auto pinInfo = PIN_MAP.find(handlerConfig.pin);
     if (pinInfo == PIN_MAP.end() || !pinInfo->second.isPWM)
     {
-        Serial.printf("ERROR: Invalid PWM pin: %s\n", handlerConfig.pin);
+        LOG.errorf("ConfigManager", "Invalid PWM pin: %s (isPWM: %s)",
+                   handlerConfig.pin, pinInfo == PIN_MAP.end() ? "unknown" : (pinInfo->second.isPWM ? "yes" : "no"));
         return;
     }
 
@@ -161,38 +167,57 @@ void ConfigManager::configurePWMHandler(const HandlerConfig &handlerConfig)
     int max = handlerConfig.max;
     bool inverted = handlerConfig.inverted;
 
-    // Validate failsafe value is within range
-    if (failsafeValue < CHANNEL_MIN || failsafeValue > CHANNEL_MAX)
+    // Add detailed debug logging
+    LOG.debugf("ConfigManager", "Configuring PWM handler - Channel: %d, Pin: %s (GPIO%d)",
+               channel, handlerConfig.pin, pinInfo->second.pin);
+
+    // Validate channel number
+    if (channel < 1 || channel > HIGHEST_CHANNEL_NUMBER)
     {
-        Serial.printf("ERROR: Failsafe value %d is out of range (%d-%d)\n",
-                      failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
+        LOG.errorf("ConfigManager", "Invalid channel number: %d", channel);
         return;
     }
 
-    Serial.printf("  PWM Configuration:\n");
-    Serial.printf("    - Pin: %s (GPIO%d)\n", handlerConfig.pin, pinInfo->second.pin);
-    Serial.printf("    - Failsafe: %d\n", failsafeValue);
-    Serial.printf("    - Range: %d to %d\n", min, max);
-    Serial.printf("    - Inverted: %s\n", inverted ? "yes" : "no");
+    // Validate failsafe value is within range
+    if (failsafeValue < CHANNEL_MIN || failsafeValue > CHANNEL_MAX)
+    {
+        LOG.errorf("ConfigManager", "Failsafe value %d is out of range (%d-%d)",
+                   failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
+        return;
+    }
+
+    // Validate min/max values
+    if (min >= max)
+    {
+        LOG.errorf("ConfigManager", "Invalid PWM range: min (%d) must be less than max (%d)", min, max);
+        return;
+    }
+
+    LOG.debugf("ConfigManager", "PWM Config: Pin=%s(GPIO%d), Channel=%d, Failsafe=%d, Range=%d-%d, Inverted=%s",
+               handlerConfig.pin, pinInfo->second.pin, channel, failsafeValue, min, max, inverted ? "yes" : "no");
 
     auto *handler = new PWMChannelHandler(pinInfo->second.pin, min, max);
     handler->setup(failsafeValue); // Use failsafe as initial value
     handler->setInverted(inverted);
+
+    LOG.debugf("ConfigManager", "Registering PWM handler for channel %d", channel);
     this->computer->onChannelChange(channel, handler, failsafeValue);
+
+    LOG.debug("ConfigManager", "PWM handler registration complete");
 }
 
 void ConfigManager::configureOnOffHandler(const HandlerConfig &handlerConfig)
 {
     if (!handlerConfig.failsafe)
     {
-        Serial.println("ERROR: OnOff handler requires 'failsafe' value");
+        LOG.error("ConfigManager", "OnOff handler requires 'failsafe' value");
         return;
     }
 
     auto pinInfo = PIN_MAP.find(handlerConfig.pin);
     if (pinInfo == PIN_MAP.end())
     {
-        Serial.printf("ERROR: Invalid pin: %s\n", handlerConfig.pin);
+        LOG.errorf("ConfigManager", "Invalid pin: %s", handlerConfig.pin);
         return;
     }
 
@@ -200,37 +225,47 @@ void ConfigManager::configureOnOffHandler(const HandlerConfig &handlerConfig)
     int failsafeValue = handlerConfig.failsafe;
     auto compareFunc = createThresholdFunction(handlerConfig);
 
-    // Validate failsafe value is within range
-    if (failsafeValue < CHANNEL_MIN || failsafeValue > CHANNEL_MAX)
+    // Add detailed debug logging
+    LOG.debugf("ConfigManager", "Configuring OnOff handler - Channel: %d, Pin: %s (GPIO%d)",
+               channel, handlerConfig.pin, pinInfo->second.pin);
+
+    // Validate channel number
+    if (channel < 1 || channel > HIGHEST_CHANNEL_NUMBER)
     {
-        Serial.printf("ERROR: Failsafe value %d is out of range (%d-%d)\n",
-                      failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
+        LOG.errorf("ConfigManager", "Invalid channel number: %d", channel);
         return;
     }
 
-    Serial.printf("  OnOff Configuration:\n");
-    Serial.printf("    - Pin: %s (GPIO%d)\n", handlerConfig.pin, pinInfo->second.pin);
-    Serial.printf("    - Failsafe: %d\n", failsafeValue);
-    Serial.printf("    - Threshold: %d\n", handlerConfig.threshold);
-    Serial.printf("    - Operator: %s\n", handlerConfig.op);
+    // Validate failsafe value is within range
+    if (failsafeValue < CHANNEL_MIN || failsafeValue > CHANNEL_MAX)
+    {
+        LOG.errorf("ConfigManager", "Failsafe value %d is out of range (%d-%d)",
+                   failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
+        return;
+    }
+
+    LOG.debugf("ConfigManager", "OnOff Config: Pin=%s(GPIO%d), Failsafe=%d, Threshold=%d, Operator=%s",
+               handlerConfig.pin, pinInfo->second.pin, failsafeValue, handlerConfig.threshold, handlerConfig.op);
 
     auto *handler = new OnOffChannelHandler(pinInfo->second.pin);
     handler->isOnWhen(compareFunc);
     this->computer->onChannelChange(channel, handler, failsafeValue);
+
+    LOG.debug("ConfigManager", "Handler registration complete");
 }
 
 void ConfigManager::configureBlinkHandler(const HandlerConfig &handlerConfig)
 {
     if (!handlerConfig.failsafe)
     {
-        Serial.println("ERROR: Blink handler requires 'failsafe' value");
+        LOG.error("ConfigManager", "Blink handler requires 'failsafe' value");
         return;
     }
 
     auto pinInfo = PIN_MAP.find(handlerConfig.pin);
     if (pinInfo == PIN_MAP.end())
     {
-        Serial.printf("ERROR: Invalid pin: %s\n", handlerConfig.pin);
+        LOG.errorf("ConfigManager", "Invalid pin: %s", handlerConfig.pin);
         return;
     }
 
@@ -243,17 +278,13 @@ void ConfigManager::configureBlinkHandler(const HandlerConfig &handlerConfig)
     // Validate failsafe value is within range
     if (failsafeValue < CHANNEL_MIN || failsafeValue > CHANNEL_MAX)
     {
-        Serial.printf("ERROR: Failsafe value %d is out of range (%d-%d)\n",
-                      failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
+        LOG.errorf("ConfigManager", "Failsafe value %d is out of range (%d-%d)",
+                   failsafeValue, CHANNEL_MIN, CHANNEL_MAX);
         return;
     }
 
-    Serial.printf("  Blink Configuration:\n");
-    Serial.printf("    - Pin: %s (GPIO%d)\n", handlerConfig.pin, pinInfo->second.pin);
-    Serial.printf("    - Failsafe: %d\n", failsafeValue);
-    Serial.printf("    - Timing: %dms on, %dms off\n", onTime, offTime);
-    Serial.printf("    - Threshold: %d\n", handlerConfig.threshold);
-    Serial.printf("    - Operator: %s\n", handlerConfig.op);
+    LOG.debugf("ConfigManager", "Blink Config: Pin=%s(GPIO%d), Failsafe=%d, Timing=%dms on, %dms off, Threshold=%d, Operator=%s",
+               handlerConfig.pin, pinInfo->second.pin, failsafeValue, onTime, offTime, handlerConfig.threshold, handlerConfig.op);
 
     auto *handler = new BlinkChannelHandler(pinInfo->second.pin, onTime, offTime);
     handler->isOnWhen(compareFunc);
@@ -284,7 +315,7 @@ auto ConfigManager::createThresholdFunction(const HandlerConfig &handlerConfig) 
     }
     else
     {
-        Serial.printf("WARNING: Unknown operator '%s', defaulting to greaterThan\n", op);
+        LOG.warningf("ConfigManager", "Unknown operator '%s', defaulting to greaterThan", op);
         compareFunc = [threshold](uint16_t value)
         { return value > threshold; };
     }
@@ -300,15 +331,14 @@ Config ConfigManager::parseJson(const char *jsonConfig)
 
     if (error)
     {
-        Serial.print("JSON parsing failed: ");
-        Serial.println(error.c_str());
+        LOG.errorf("ConfigManager", "JSON parsing failed: %s", error.c_str());
         return config;
     }
 
-    Serial.println("JSON parsed successfully");
+    LOG.infof("ConfigManager", "JSON parsed successfully");
     JsonArray handlers = doc["handlers"];
     size_t numHandlers = std::min(handlers.size(), static_cast<size_t>(Config::MAX_HANDLERS));
-    Serial.printf("Found %d handlers to configure\n", numHandlers);
+    LOG.infof("ConfigManager", "Found %d handlers to configure", numHandlers);
 
     config.numHandlers = numHandlers;
     for (size_t i = 0; i < numHandlers; i++)
@@ -328,6 +358,10 @@ Config ConfigManager::parseJson(const char *jsonConfig)
         handlerConfig.onTime = handler["onTime"] | 300;
         handlerConfig.offTime = handler["offTime"] | 400;
     }
+
+    strncpy(config.apSsid, doc["apSsid"] | "Boardcomputer", sizeof(config.apSsid));
+    strncpy(config.apPassword, doc["apPassword"] | "boardcomputer", sizeof(config.apPassword));
+    config.keepWebServerRunning = doc["keepWebServerRunning"] | false;
 
     return config;
 }

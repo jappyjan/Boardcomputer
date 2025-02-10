@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Boardcomputer</title>
-    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#2196f3">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -159,21 +158,248 @@
         input[type="range"]::-webkit-slider-thumb:hover {
             background: #1976d2;
         }
+        
+        .advanced-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .advanced-section h2 {
+            color: #1976d2;
+            margin-bottom: 1rem;
+        }
+        
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        
+        .warning-box p {
+            margin: 0;
+            color: #e65100;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .warning {
+            color: #e65100;
+            display: block;
+            margin-top: 0.25rem;
+        }
+        
+        small {
+            font-size: 0.85em;
+            color: #666;
+            display: block;
+            margin-top: 0.25rem;
+        }
+        
+        .log-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .log-output {
+            background: #1e1e1e;
+            color: #e0e0e0;
+            font-family: monospace;
+            padding: 1rem;
+            border-radius: 4px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .log-output .error { color: #ff5252; }
+        .log-output .warn { color: #ffd740; }
+        .log-output .debug { color: #69f0ae; }
+        
+        .log-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .telemetry-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .channel {
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .channel-bar {
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .channel-value {
+            height: 100%;
+            background: #2196f3;
+            width: 50%;
+            transition: width 0.1s ease;
+        }
+
+        .channel-number {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 1000;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-connected {
+            background: #4caf50;
+        }
+
+        .status-connecting {
+            background: #ff9800;
+            animation: blink 1s infinite;
+        }
+
+        .status-disconnected {
+            background: #f44336;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
+    <div class="connection-status">
+        <span class="status-indicator status-disconnected" id="wsIndicator"></span>
+        <span id="wsStatus">Disconnected</span>
+    </div>
     <div class="container">
         <h1>Boardcomputer</h1>
         <div id="status"></div>
         <div id="handlers"></div>
+        <div class="advanced-section">
+            <h2>Advanced Settings</h2>
+            <div class="warning-box">
+                <p>⚠️ These settings are for advanced users only. The "Keep Web Server Running" option should only be enabled for testing purposes as it may impact performance and security.</p>
+            </div>
+            <div class="fields-grid">
+                <div class="field">
+                    <label>Access Point SSID:</label>
+                    <input type="text" 
+                        id="apSsid" 
+                        value="" 
+                        onchange="updateConfigKey('apSsid', this.value)">
+                </div>
+                <div class="field">
+                    <label>Access Point Password:</label>
+                    <input type="text" 
+                        id="apPassword" 
+                        value="" 
+                        minlength="8"
+                        onchange="updateConfigKey('apPassword', this.value)">
+                </div>
+                <div class="field">
+                    <label class="checkbox-label">
+                        <input type="checkbox" 
+                            id="keepWebServerRunning" 
+                            onchange="updateConfigKey('keepWebServerRunning', this.checked)">
+                        Keep Web Server Running
+                    </label>
+                    <small class="warning">Enable only for testing! May impact performance.</small>
+                </div>
+            </div>
+        </div>
         <div class="button-group">
             <button onclick="addHandler()">Add Handler</button>
             <button onclick="saveConfig()" class="secondary">Save Configuration</button>
         </div>
+        <div class="log-section">
+            <h2>Live Logs</h2>
+            <div class="log-controls">
+                <button onclick="toggleLogs()" id="logToggle">Enable Logs</button>
+                <button onclick="clearLogs()" class="secondary">Clear</button>
+            </div>
+            <div id="logOutput" class="log-output" style="display: none;"></div>
+        </div>
+
+        <!-- Add Telemetry Section -->
+        <div class="telemetry-section">
+            <h2>Live Telemetry</h2>
+            <div class="log-controls">
+                <button onclick="toggleTelemetry()" id="telemetryToggle">Enable Telemetry</button>
+            </div>
+            <div id="telemetryOutput" style="display: none;">
+                <div class="status-indicators">
+                    <div id="receiverStatus">Receiver Status: Disconnected</div>
+                    <div id="errorStatus">Error Status: OK</div>
+                </div>
+                <div class="channels-grid">
+                    <!-- Channels will be added dynamically -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        let config = null;
+        let config = {
+            handlers: [],
+            apSsid: '',
+            apPassword: '',
+            keepWebServerRunning: false
+        };
 
         // Channel constants
         const CHANNEL_MIN = 1000;
@@ -358,14 +584,20 @@
                     fetch('/api/pins')
                 ]);
                 
-                config = await configResponse.json();
+                const data = await configResponse.json();
+                config = {
+                    handlers: data.handlers || [],
+                    apSsid: data.apSsid,
+                    apPassword: data.apPassword,
+                    keepWebServerRunning: data.keepWebServerRunning
+                };
+                
                 pinMap = await pinMapResponse.json();
                 
-                if (!config.handlers) {
-                    config.handlers = [];
-                }
                 renderHandlers();
+                updateAdvancedUI();
             } catch (error) {
+                console.error(error);
                 showStatus('Error loading configuration', true);
             }
         }
@@ -530,6 +762,8 @@
                 handler[field] = value;
             } else if (field === 'pin') {
                 handler[field] = value;
+            } else if (field === 'operator') {
+                handler[field] = value;
             } else {
                 handler[field] = Number(value);
             }
@@ -626,37 +860,53 @@
             return null; // No validation errors
         }
 
+        // Update advanced UI
+        function updateAdvancedUI() {
+            document.getElementById('apSsid').value = config.apSsid;
+            document.getElementById('apPassword').value = config.apPassword;
+            document.getElementById('keepWebServerRunning').checked = config.keepWebServerRunning;
+        }
+
+        // Update advanced setting
+        function updateConfigKey(setting, value) {
+            config[setting] = value;
+        }
+
+        // Validate advanced settings
+        function validateAdvancedSettings() {
+            if (!config.apSsid || config.apSsid.trim().length === 0) {
+                return 'Access Point SSID is required';
+            }
+            
+            if (!config.apPassword || config.apPassword.length < 8) {
+                return 'Access Point Password must be at least 8 characters';
+            }
+            
+            return null;
+        }
+
         // Save configuration with validation
         async function saveConfig() {
-            // Validate all handlers
+            // Validate handlers
+            const usedPins = new Set();
             for (let i = 0; i < config.handlers.length; i++) {
                 const error = validateHandler(config.handlers[i]);
                 if (error) {
                     showStatus(`Error in Handler ${i + 1}: ${error}`, true);
                     return;
                 }
-            }
-
-            // Check for duplicate pins
-            const usedPins = new Map();
-            for (let i = 0; i < config.handlers.length; i++) {
-                const handler = config.handlers[i];
-                if (usedPins.has(handler.pin)) {
-                    showStatus(`Error: Pin ${handler.pin} is used by multiple handlers (Handler ${usedPins.get(handler.pin) + 1} and Handler ${i + 1})`, true);
+                if (usedPins.has(config.handlers[i].pin)) {
+                    showStatus('A Pin can only be used in one Handler at a time', true);
                     return;
                 }
-                usedPins.set(handler.pin, i);
+                usedPins.add(config.handlers[i].pin)
             }
-
-            // Check for duplicate channels
-            const usedChannels = new Map();
-            for (let i = 0; i < config.handlers.length; i++) {
-                const handler = config.handlers[i];
-                if (usedChannels.has(handler.channel)) {
-                    showStatus(`Error: Channel ${handler.channel} is used by multiple handlers (Handler ${usedChannels.get(handler.channel) + 1} and Handler ${i + 1})`, true);
-                    return;
-                }
-                usedChannels.set(handler.channel, i);
+            
+            // Validate advanced settings
+            const advancedError = validateAdvancedSettings();
+            if (advancedError) {
+                showStatus(`Error in Advanced Settings: ${advancedError}`, true);
+                return;
             }
 
             try {
@@ -672,15 +922,9 @@
                 
                 showStatus('Configuration saved successfully');
             } catch (error) {
+                console.error(error);
                 showStatus(`Error saving configuration: ${error.message}`, true);
             }
-        }
-
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(() => console.log('Service Worker registered'))
-                .catch(error => console.error('Service Worker registration failed:', error));
         }
 
         // Remove handler
@@ -691,8 +935,146 @@
             }
         }
 
-        // Initial load
+        const eventSource = new EventSource('/events');
+        let logsEnabled = false;
+        let telemetryEnabled = false;
+
+        eventSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Event received:', data);
+                
+                switch(data.type) {
+                    case 0: // LOGGING
+                        handleLogMessage(data.data);
+                        break;
+                    case 1: // TELEMETRY
+                        if (telemetryEnabled) {
+                            updateTelemetry(data.data);
+                        }
+                        break;
+                    default:
+                        console.warn('Unknown event type:', data.type);
+                }
+            } catch (error) {
+                console.error('Error processing event:', error);
+            }
+        };
+
+        eventSource.onerror = function(error) {
+            console.error('EventSource error:', error);
+            // EventSource automatically tries to reconnect
+        };
+
+        // Update toggle functions to not use WebSocket
+        function toggleLogs() {
+            const logOutput = document.getElementById('logOutput');
+            const logToggle = document.getElementById('logToggle');
+            logsEnabled = !logsEnabled;
+            
+            if (logsEnabled) {
+                logOutput.style.display = 'block';
+                logToggle.textContent = 'Disable Logs';
+            } else {
+                logOutput.style.display = 'none';
+                logToggle.textContent = 'Enable Logs';
+            }
+        }
+
+        function toggleTelemetry() {
+            const telemetryOutput = document.getElementById('telemetryOutput');
+            const telemetryToggle = document.getElementById('telemetryToggle');
+            telemetryEnabled = !telemetryEnabled;
+            
+            if (telemetryEnabled) {
+                telemetryOutput.style.display = 'block';
+                telemetryToggle.textContent = 'Disable Telemetry';
+            } else {
+                telemetryOutput.style.display = 'none';
+                telemetryToggle.textContent = 'Enable Telemetry';
+            }
+        }
+
+        function updateTelemetry(data) {
+            // Update status indicators
+            const receiverStatus = document.getElementById('receiverStatus');
+            const errorStatus = document.getElementById('errorStatus');
+            
+            receiverStatus.textContent = `Receiver Status: ${data.isReceiving ? 'Connected' : 'Disconnected'}`;
+            receiverStatus.style.color = data.isReceiving ? '#4caf50' : '#f44336';
+            
+            errorStatus.textContent = `Error Status: ${data.hasError ? 'Error' : 'OK'}`;
+            errorStatus.style.color = data.hasError ? '#f44336' : '#4caf50';
+            
+            // Update channel values
+            data.channels.forEach((value, index) => {
+                const channelBar = document.getElementById(`channel${index}`);
+                const channelValue = document.getElementById(`channel${index}Value`);
+                
+                // Calculate percentage (1000-2000 range to 0-100%)
+                const percentage = ((value - 1000) / 1000) * 100;
+                channelBar.style.width = `${percentage}%`;
+                channelValue.textContent = value;
+                
+                // Color coding based on value
+                if (value < 1100) {
+                    channelBar.style.backgroundColor = '#f44336'; // Red for low
+                } else if (value > 1900) {
+                    channelBar.style.backgroundColor = '#4caf50'; // Green for high
+                } else {
+                    channelBar.style.backgroundColor = '#2196f3'; // Blue for middle
+                }
+            });
+        }
+
+        // Add this function after the existing WebSocket message handler
+        function handleLogMessage(message) {
+            const logOutput = document.getElementById('logOutput');
+            const logLine = document.createElement('div');
+            
+            // Add color classes based on log level
+            if (message.includes('[ERROR]')) {
+                logLine.className = 'error';
+            } else if (message.includes('[WARN]')) {
+                logLine.className = 'warn';
+            } else if (message.includes('[DEBUG]')) {
+                logLine.className = 'debug';
+            }
+            
+            logLine.textContent = message;
+            logOutput.appendChild(logLine);
+            logOutput.scrollTop = logOutput.scrollHeight;
+            
+            // Keep only last 1000 lines
+            while (logOutput.childNodes.length > 1000) {
+                logOutput.removeChild(logOutput.firstChild);
+            }
+        }
+
+        function setupTelemetry() {
+            // Create channel displays
+            const channelsGrid = document.querySelector('.channels-grid');
+            channelsGrid.innerHTML = '';
+            
+            for (let i = 0; i < 16; i++) {
+                const channelDiv = document.createElement('div');
+                channelDiv.className = 'channel';
+                const channelNumber = i + 1;
+                const displayName = channelNumber <= 4 ? `Channel ${channelNumber}` : `AUX ${channelNumber - 4}`;
+                channelDiv.innerHTML = `
+                    <div>${displayName}</div>
+                    <div class="channel-bar">
+                        <div class="channel-value" id="channel${i}" style="width: 50%"></div>
+                    </div>
+                    <div class="channel-number" id="channel${i}Value">1500</div>
+                `;
+                channelsGrid.appendChild(channelDiv);
+            }
+        }
+
+        // Initial setup
         loadConfig();
+        setupTelemetry();
     </script>
 </body>
 </html>
