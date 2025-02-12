@@ -3,11 +3,11 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <vector>
-#include "boardcomputer.hpp"
+#include "bordcomputer.hpp"
 #include "channel-handlers/pwmChannelHandler.hpp"
 #include "channel-handlers/onOffChannelHandler.hpp"
 #include "channel-handlers/blinkChannelHandler.hpp"
-#include "board_pin_map.hpp"
+#include "pin_map.hpp"
 #include "eeprom_manager.hpp"
 #include "config_versions.hpp"
 

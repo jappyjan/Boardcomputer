@@ -68,8 +68,8 @@ namespace ConfigVersions
         ConfigV1()
         {
             numHandlers = 0;
-            strncpy(apSsid, "Boardcomputer", sizeof(apSsid) - 1);
-            strncpy(apPassword, "boardcomputer", sizeof(apPassword) - 1);
+            strncpy(apSsid, "Bordcomputer", sizeof(apSsid) - 1);
+            strncpy(apPassword, "bordcomputer", sizeof(apPassword) - 1);
             apSsid[sizeof(apSsid) - 1] = '\0';
             apPassword[sizeof(apPassword) - 1] = '\0';
             keepWebServerRunning = false;

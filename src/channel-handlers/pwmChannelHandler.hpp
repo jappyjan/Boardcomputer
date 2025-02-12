@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boardcomputer.hpp"
+#include "bordcomputer.hpp"
 
 #define PWM_MIN 1000
 #define PWM_MAX 2000

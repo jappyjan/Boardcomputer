@@ -1,5 +1,5 @@
-#include "boardcomputer.hpp"
-#include "board_pin_map.hpp"
+#include "bordcomputer.hpp"
+#include "pin_map.hpp"
 #include <ArduinoJson.h>
 
 #include "logger.hpp"
@@ -324,7 +324,7 @@ String BoardComputer::getPinMap()
 {
     StaticJsonDocument<512> doc;
 
-    const auto &pinMap = ::getPinMap(); // Use global scope operator to get the function from board_pin_map.hpp
+    const auto &pinMap = ::getPinMap(); // Use global scope operator to get the function from pin_map.hpp
 
     // Use traditional iterator instead of structured binding
     for (const auto &pair : pinMap)

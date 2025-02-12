@@ -2960,7 +2960,7 @@
 			(uuid "a00966b4-e953-45c0-9d87-ab6e12e361e0")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J13")
 					(unit 1)
@@ -3098,7 +3098,7 @@
 			(uuid "2ad0d24e-db60-406d-aaa7-93527258ede9")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J10")
 					(unit 1)
@@ -3170,7 +3170,7 @@
 			(uuid "20b25d28-fc51-42d9-b290-a6f86c690ce0")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J5")
 					(unit 1)
@@ -3371,7 +3371,7 @@
 			(uuid "80382fd9-ae65-4072-a793-55c36226fa3d")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "#PWR06")
 					(unit 1)
@@ -3871,7 +3871,7 @@
 			(uuid "9c22d6e0-9528-4728-8ec8-bf90ac86589b")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "#PWR04")
 					(unit 1)
@@ -4010,7 +4010,7 @@
 			(uuid "c3b04604-e885-4435-89c9-ff218577fb11")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J7")
 					(unit 1)
@@ -4082,7 +4082,7 @@
 			(uuid "7b8ff80d-6834-4cfc-a6ab-72d3d24a06ba")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J8")
 					(unit 1)
@@ -4362,7 +4362,7 @@
 			(uuid "3016cd3d-ddda-4004-b5fe-f04387d963e6")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J12")
 					(unit 1)
@@ -4501,7 +4501,7 @@
 			(uuid "def856a8-fb45-44fd-a041-76531e7ea146")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J11")
 					(unit 1)
@@ -4638,7 +4638,7 @@
 			(uuid "87569d13-ac19-4655-909a-ae46e0fa6927")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J2")
 					(unit 1)
@@ -4710,7 +4710,7 @@
 			(uuid "4e5f8f90-a98a-4124-be92-4415728cbee4")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J9")
 					(unit 1)
@@ -4848,7 +4848,7 @@
 			(uuid "5c6e205a-a89c-4dba-832d-a83a4c728789")
 		)
 		(instances
-			(project "Boardcomputer"
+			(project "Bordcomputer"
 				(path "/564234c2-a311-410e-be20-45664eb02a7c"
 					(reference "J6")
 					(unit 1)

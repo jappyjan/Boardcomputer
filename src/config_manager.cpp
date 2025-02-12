@@ -359,8 +359,8 @@ Config ConfigManager::parseJson(const char *jsonConfig)
         handlerConfig.offTime = handler["offTime"] | 400;
     }
 
-    strncpy(config.apSsid, doc["apSsid"] | "Boardcomputer", sizeof(config.apSsid));
-    strncpy(config.apPassword, doc["apPassword"] | "boardcomputer", sizeof(config.apPassword));
+    strncpy(config.apSsid, doc["apSsid"] | "Bordcomputer", sizeof(config.apSsid));
+    strncpy(config.apPassword, doc["apPassword"] | "bordcomputer", sizeof(config.apPassword));
     config.keepWebServerRunning = doc["keepWebServerRunning"] | false;
 
     return config;

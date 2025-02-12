@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boardcomputer.hpp"
+#include "bordcomputer.hpp"
 
 class BlinkChannelHandler : public IChannelHandler
 {
